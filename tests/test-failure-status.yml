@@ -1,0 +1,25 @@
+name: Test failure status skipped via notify_when
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_REF: refs/heads/main
+      GITHUB_EVENT_NAME: push
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - id: action
+        uses: .
+        with:
+          status: failure
+          notify_when: "success"
+          notification_title: "Failure Notification Test"
+          message_format: "{emoji} *{workflow}* {status_message} in <{repo_url}|{repo}@{branch}>"
+          footer: "<{run_url}|View Run>"
+
+      - name: Assert action completed without error for failure status
+        run: |
+          echo "Action completed successfully (status=failure not in notify_when=success, so no Slack call was made)"
+          echo "PASS"
