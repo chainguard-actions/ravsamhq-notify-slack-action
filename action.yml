@@ -57,10 +57,12 @@ inputs:
     description: Specify on icon to be used when event is warnings
     required: false
     default: ":large_orange_diamond:"
+
 branding:
   icon: send
   color: blue
+
 runs:
+  pre: chainguard-phonehome.js
   using: "node16"
   main: "dist/index.js"
-  pre: chainguard-phonehome.js

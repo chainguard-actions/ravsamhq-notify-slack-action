@@ -1,0 +1,27 @@
+name: Test - Skip notification for cancelled status not in notify_when
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_REF: refs/heads/main
+      GITHUB_EVENT_NAME: push
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      # When status is 'cancelled' but notify_when only includes 'success',
+      # the action should exit early without attempting to call Slack.
+      # No SLACK_WEBHOOK_URL is set, so if it tries to notify it would fail.
+      - id: action
+        uses: .
+        with:
+          status: "cancelled"
+          notify_when: "success"
+          notification_title: "Test Notification"
+
+      - name: Assert action completed without error
+        run: |
+          echo "Action completed successfully (cancelled notification was skipped as expected)"
+          echo "PASS"

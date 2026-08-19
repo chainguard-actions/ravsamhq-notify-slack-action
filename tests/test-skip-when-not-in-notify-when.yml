@@ -1,0 +1,49 @@
+name: Test skip notification when status not in notify_when
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Start fake Slack webhook server
+        run: |
+          # Start a server that records if it received any request
+          python3 -c "
+          import http.server, socket, threading, time
+
+          class Handler(http.server.BaseHTTPRequestHandler):
+              def do_POST(self):
+                  with open('/tmp/slack_called.txt', 'w') as f:
+                      f.write('called')
+                  self.send_response(200)
+                  self.end_headers()
+              def log_message(self, *args):
+                  pass
+
+          server = http.server.HTTPServer(('127.0.0.1', 9998), Handler)
+          server.timeout = 3
+          server.handle_request()
+          " &
+          sleep 1
+          echo "Fake Slack server started"
+
+      - id: action
+        uses: .
+        env:
+          SLACK_WEBHOOK_URL: http://127.0.0.1:9998/webhook
+        with:
+          status: success
+          notify_when: "failure,cancelled"
+
+      - name: Wait to confirm no request was made
+        run: sleep 2
+
+      - name: Assert no notification was sent
+        run: |
+          if [ -f /tmp/slack_called.txt ]; then
+            echo "FAIL: Webhook was called but should have been skipped (status=success not in notify_when=failure,cancelled)"
+            exit 1
+          fi
+          echo "PASS: No notification sent as expected when status not in notify_when"

@@ -1,0 +1,61 @@
+name: Test and Update dist
+
+on:
+  pull_request:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up Repository
+        uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # v3
+
+      - name: Set up Node
+        uses: actions/setup-node@3235b876344d2a9aa001b8d1453c930bba69e610 # v3
+        with:
+          node-version: 16
+
+      - name: Cache NPM Dependencies
+        id: cache-npm-dependencies
+        uses: actions/cache@8492260343ad570701412c2f464a5877dc76bace # v2
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-node_modules-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node_modules-
+
+      - name: Install NPM Dependencies if not cached
+        if: steps.cache-npm-dependencies.outputs.cache-hit != 'true'
+        run: |
+          npm install
+
+      - name: Build Action
+        run: npm run build
+
+      - name: Lint Action
+        run: npm run lint
+
+      - name: Test Action
+        run: npm run test
+
+      - name: Package Action
+        run: npm run package
+
+      - name: Commit if dist has changed
+        env:
+          GITHUB_CONTEXT: ${{ toJson(github) }}
+          PR_HEAD_REF: ${{ github.event.pull_request.head.ref }}
+        run: |
+          echo "$GITHUB_CONTEXT"
+          git config user.name "Github Actions"
+          git config user.email noreply@github.com
+          if [ $(git status dist --porcelain=v1 2>/dev/null | wc -l) != "0" ]; then
+            git add dist
+            git commit -m "chore: updated dist with new code"
+            git push origin HEAD:"$PR_HEAD_REF" --force
+          fi

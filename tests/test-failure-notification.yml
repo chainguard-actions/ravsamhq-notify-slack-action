@@ -1,0 +1,68 @@
+name: Test failure notification with custom options
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Start fake Slack webhook server
+        run: |
+          python3 -c "
+          import http.server
+
+          class Handler(http.server.BaseHTTPRequestHandler):
+              def do_POST(self):
+                  length = int(self.headers.get('Content-Length', 0))
+                  body = self.rfile.read(length).decode()
+                  with open('/tmp/slack_failure_payload.json', 'w') as f:
+                      f.write(body)
+                  self.send_response(200)
+                  self.end_headers()
+                  self.wfile.write(b'ok')
+              def log_message(self, *args):
+                  pass
+
+          server = http.server.HTTPServer(('127.0.0.1', 9997), Handler)
+          server.handle_request()
+          " &
+          sleep 1
+          echo "Fake Slack server started"
+
+      - id: action
+        uses: .
+        env:
+          SLACK_WEBHOOK_URL: http://127.0.0.1:9997/webhook
+        with:
+          status: failure
+          notification_title: "Build Failed!"
+          notify_when: "failure"
+          mention_users: "U12345678"
+          mention_users_when: "failure"
+          icon_failure: ":boom:"
+
+      - name: Wait for webhook request
+        run: sleep 2
+
+      - name: Assert failure payload was sent with correct color and mention
+        run: |
+          if [ ! -f /tmp/slack_failure_payload.json ]; then
+            echo "FAIL: No payload was sent to the webhook"
+            exit 1
+          fi
+          echo "Payload received:"
+          cat /tmp/slack_failure_payload.json
+          echo ""
+
+          python3 -c "
+          import json
+          with open('/tmp/slack_failure_payload.json') as f:
+              data = json.load(f)
+          assert 'attachments' in data, 'Missing attachments key'
+          att = data['attachments'][0]
+          assert att['color'] == 'danger', f'Expected color=danger for failure, got {att[\"color\"]}'
+          assert att['pretext'] == 'Build Failed!', f'Expected pretext=Build Failed!, got {att[\"pretext\"]}'
+          assert '<@U12345678>' in att['text'], f'Expected user mention in text, got: {att[\"text\"]}'
+          print('PASS: failure payload is valid with correct color, title, and user mention')
+          "

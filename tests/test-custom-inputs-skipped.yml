@@ -1,0 +1,37 @@
+name: Test - Custom inputs accepted when notification is skipped
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_REF: refs/heads/feature-branch
+      GITHUB_EVENT_NAME: push
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      # Pass all optional inputs with custom values.
+      # Status 'success' is not in notify_when 'failure,cancelled',
+      # so the action exits early without needing a webhook URL.
+      - id: action
+        uses: .
+        with:
+          status: "success"
+          notify_when: "failure,cancelled"
+          notification_title: "Custom Title: {workflow} {status_message}"
+          message_format: "{emoji} *{workflow}* {status_message} in <{repo_url}|{repo}>"
+          footer: "Custom footer | <{run_url}|View Run>"
+          icon_success: ":white_check_mark:"
+          icon_failure: ":red_circle:"
+          icon_cancelled: ":grey_question:"
+          icon_warnings: ":warning:"
+          mention_users: "U0160UUNH8S"
+          mention_users_when: "failure"
+          mention_groups: "SAZ94GDB8"
+          mention_groups_when: "failure"
+
+      - name: Assert action completed without error
+        run: |
+          echo "Action accepted all custom inputs and skipped notification as expected"
+          echo "PASS"

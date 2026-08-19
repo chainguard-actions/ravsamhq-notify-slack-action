@@ -1,0 +1,67 @@
+name: Test success notification
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Start fake Slack webhook server
+        run: |
+          # Start a simple HTTP server that accepts POST and returns 200
+          python3 -c "
+          import http.server, threading, json, sys
+
+          class Handler(http.server.BaseHTTPRequestHandler):
+              def do_POST(self):
+                  length = int(self.headers.get('Content-Length', 0))
+                  body = self.rfile.read(length).decode()
+                  # Write payload to file for assertion
+                  with open('/tmp/slack_payload.json', 'w') as f:
+                      f.write(body)
+                  self.send_response(200)
+                  self.end_headers()
+                  self.wfile.write(b'ok')
+              def log_message(self, *args):
+                  pass
+
+          server = http.server.HTTPServer(('127.0.0.1', 9999), Handler)
+          server.handle_request()
+          " &
+          sleep 1
+          echo "Fake Slack server started"
+
+      - id: action
+        uses: .
+        env:
+          SLACK_WEBHOOK_URL: http://127.0.0.1:9999/webhook
+        with:
+          status: success
+          notification_title: "Test Notification"
+          notify_when: "success,failure,cancelled,warnings"
+
+      - name: Wait for webhook request
+        run: sleep 2
+
+      - name: Assert payload was sent
+        run: |
+          if [ ! -f /tmp/slack_payload.json ]; then
+            echo "FAIL: No payload was sent to the webhook"
+            exit 1
+          fi
+          echo "Payload received:"
+          cat /tmp/slack_payload.json
+          echo ""
+
+          # Verify it's valid JSON with attachments
+          python3 -c "
+          import json, sys
+          with open('/tmp/slack_payload.json') as f:
+              data = json.load(f)
+          assert 'attachments' in data, 'Missing attachments key'
+          assert len(data['attachments']) > 0, 'No attachments'
+          att = data['attachments'][0]
+          assert att['color'] == 'good', f'Expected color=good, got {att[\"color\"]}'
+          print('PASS: payload is valid with correct color for success')
+          "
