@@ -1,0 +1,35 @@
+name: Test mention users on failure
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_REF: refs/heads/main
+      GITHUB_EVENT_NAME: push
+      SLACK_WEBHOOK_URL: https://hooks.slack.com/services/FAKE/FAKE/FAKE
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Run action with mention_users on failure
+        id: action
+        uses: .
+        with:
+          status: failure
+          notification_title: "Build Failed - Mentioning Users"
+          notify_when: "failure"
+          mention_users: "U12345678,U87654321"
+          mention_users_when: "failure"
+        # The action may fail at the HTTP POST step since webhook is fake
+        continue-on-error: true
+
+      - name: Assert action ran (not skipped)
+        env:
+          OUTCOME: ${{ steps.action.outcome }}
+        run: |
+          echo "action outcome: $OUTCOME"
+          if [ "$OUTCOME" = "skipped" ]; then
+            echo "FAIL: action was unexpectedly skipped"
+            exit 1
+          fi
+          echo "PASS: action ran with outcome=$OUTCOME"

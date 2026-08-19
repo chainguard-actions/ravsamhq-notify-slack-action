@@ -1,0 +1,74 @@
+name: Test custom message format and mentions
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Start fake Slack webhook server
+        run: |
+          python3 -c "
+          import http.server, threading
+
+          class Handler(http.server.BaseHTTPRequestHandler):
+              def do_POST(self):
+                  length = int(self.headers.get('Content-Length', 0))
+                  body = self.rfile.read(length)
+                  with open('/tmp/slack_custom_payload.json', 'wb') as f:
+                      f.write(body)
+                  self.send_response(200)
+                  self.end_headers()
+                  self.wfile.write(b'ok')
+              def log_message(self, *args):
+                  pass
+
+          server = http.server.HTTPServer(('127.0.0.1', 9997), Handler)
+          t = threading.Thread(target=server.serve_forever)
+          t.daemon = True
+          t.start()
+          import time; time.sleep(30)
+          " &
+          sleep 1
+          echo "Fake Slack server started on port 9997"
+
+      - id: action
+        uses: .
+        env:
+          SLACK_WEBHOOK_URL: http://127.0.0.1:9997/webhook
+        with:
+          status: failure
+          notification_title: "Custom Alert Title"
+          message_format: "Deployment {status_message} - {emoji}"
+          mention_users: "U12345678"
+          mention_users_when: "failure"
+          notify_when: "failure"
+
+      - name: Wait for async fetch to complete
+        run: sleep 2
+
+      - name: Assert custom payload received with mentions
+        run: |
+          if [ ! -f /tmp/slack_custom_payload.json ]; then
+            echo "FAIL: No payload received by fake Slack server"
+            exit 1
+          fi
+          PAYLOAD=$(cat /tmp/slack_custom_payload.json)
+          echo "Received payload: $PAYLOAD"
+          # Check the text contains the user mention
+          if ! echo "$PAYLOAD" | python3 -c "import sys,json; d=json.load(sys.stdin); text=d['attachments'][0]['text']; assert '<@U12345678>' in text, f'mention not found in text: {text}'"; then
+            echo "FAIL: Expected user mention '<@U12345678>' in message text"
+            exit 1
+          fi
+          # Check the text contains the custom message format content
+          if ! echo "$PAYLOAD" | python3 -c "import sys,json; d=json.load(sys.stdin); text=d['attachments'][0]['text']; assert 'failed' in text, f'status_message not found in text: {text}'"; then
+            echo "FAIL: Expected 'failed' status message in text"
+            exit 1
+          fi
+          # Check the pretext contains the custom title
+          if ! echo "$PAYLOAD" | python3 -c "import sys,json; d=json.load(sys.stdin); pretext=d['attachments'][0]['pretext']; assert 'Custom Alert Title' in pretext, f'custom title not found: {pretext}'"; then
+            echo "FAIL: Expected 'Custom Alert Title' in pretext"
+            exit 1
+          fi
+          echo "PASS: Custom message format and user mention verified"

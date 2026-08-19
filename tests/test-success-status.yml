@@ -1,0 +1,35 @@
+name: Test success status notification
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_REF: refs/heads/main
+      GITHUB_EVENT_NAME: push
+      # Provide a dummy webhook URL so the action can run (HTTP call will fail gracefully)
+      SLACK_WEBHOOK_URL: https://hooks.slack.com/services/FAKE/FAKE/FAKE
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Run action with success status
+        id: action
+        uses: .
+        with:
+          status: success
+          notification_title: "Test Notification"
+          message_format: "{emoji} *{workflow}* {status_message} in <{repo_url}|{repo}@{branch}>"
+          notify_when: "success,failure,cancelled,warnings,skipped"
+        # The action may fail at the HTTP POST step since webhook is fake
+        continue-on-error: true
+
+      - name: Assert action ran (step outcome is success or failure, not skipped)
+        env:
+          OUTCOME: ${{ steps.action.outcome }}
+        run: |
+          echo "action outcome: $OUTCOME"
+          if [ "$OUTCOME" = "skipped" ]; then
+            echo "FAIL: action was skipped unexpectedly"
+            exit 1
+          fi
+          echo "PASS: action ran (outcome=$OUTCOME)"

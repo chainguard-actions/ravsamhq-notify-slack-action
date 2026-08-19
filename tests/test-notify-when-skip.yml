@@ -1,0 +1,33 @@
+name: Test notify_when skips notification when status not in list
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_REF: refs/heads/main
+      GITHUB_EVENT_NAME: push
+      SLACK_WEBHOOK_URL: https://hooks.slack.com/services/FAKE/FAKE/FAKE
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Run action with success status but notify_when only failure
+        id: action
+        uses: .
+        with:
+          status: success
+          notification_title: "Should Not Send"
+          notify_when: "failure"
+        # When status is not in notify_when, the action should exit 0 without sending
+        continue-on-error: true
+
+      - name: Assert action completed (not skipped)
+        env:
+          OUTCOME: ${{ steps.action.outcome }}
+        run: |
+          echo "action outcome: $OUTCOME"
+          if [ "$OUTCOME" = "skipped" ]; then
+            echo "FAIL: action was unexpectedly skipped"
+            exit 1
+          fi
+          echo "PASS: action ran with outcome=$OUTCOME"

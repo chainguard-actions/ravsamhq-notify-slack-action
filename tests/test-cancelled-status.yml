@@ -1,4 +1,4 @@
-name: Test failure status notification
+name: Test cancelled status notification
 on:
   workflow_dispatch:
 jobs:
@@ -16,7 +16,7 @@ jobs:
               def do_POST(self):
                   length = int(self.headers.get('Content-Length', 0))
                   body = self.rfile.read(length)
-                  with open('/tmp/slack_failure_payload.json', 'wb') as f:
+                  with open('/tmp/slack_cancelled_payload.json', 'wb') as f:
                       f.write(body)
                   self.send_response(200)
                   self.end_headers()
@@ -24,43 +24,43 @@ jobs:
               def log_message(self, *args):
                   pass
 
-          server = http.server.HTTPServer(('127.0.0.1', 9998), Handler)
+          server = http.server.HTTPServer(('127.0.0.1', 9996), Handler)
           t = threading.Thread(target=server.serve_forever)
           t.daemon = True
           t.start()
           import time; time.sleep(30)
           " &
           sleep 1
-          echo "Fake Slack server started on port 9998"
+          echo "Fake Slack server started on port 9996"
 
       - id: action
         uses: .
         env:
-          SLACK_WEBHOOK_URL: http://127.0.0.1:9998/webhook
+          SLACK_WEBHOOK_URL: http://127.0.0.1:9996/webhook
         with:
-          status: failure
-          notification_title: "Build Failed"
-          notify_when: "failure"
+          status: cancelled
+          notification_title: "Job Cancelled"
+          notify_when: "cancelled"
 
       - name: Wait for async fetch to complete
         run: sleep 2
 
-      - name: Assert failure payload received with correct color
+      - name: Assert cancelled payload received with correct color
         run: |
-          if [ ! -f /tmp/slack_failure_payload.json ]; then
+          if [ ! -f /tmp/slack_cancelled_payload.json ]; then
             echo "FAIL: No payload received by fake Slack server"
             exit 1
           fi
-          PAYLOAD=$(cat /tmp/slack_failure_payload.json)
+          PAYLOAD=$(cat /tmp/slack_cancelled_payload.json)
           echo "Received payload: $PAYLOAD"
-          # Check color is 'danger' for failure
+          # Check color is 'danger' for cancelled (same as failure per source)
           if ! echo "$PAYLOAD" | python3 -c "import sys,json; d=json.load(sys.stdin); assert d['attachments'][0]['color'] == 'danger', f'wrong color: {d[\"attachments\"][0][\"color\"]}'"; then
-            echo "FAIL: Expected color 'danger' for failure status"
+            echo "FAIL: Expected color 'danger' for cancelled status"
             exit 1
           fi
-          # Check pretext contains the custom title
-          if ! echo "$PAYLOAD" | python3 -c "import sys,json; d=json.load(sys.stdin); assert 'Build Failed' in d['attachments'][0]['pretext'], f'wrong pretext: {d[\"attachments\"][0][\"pretext\"]}'"; then
-            echo "FAIL: Expected 'Build Failed' in notification title"
+          # Check the text contains 'cancelled' status message
+          if ! echo "$PAYLOAD" | python3 -c "import sys,json; d=json.load(sys.stdin); text=d['attachments'][0]['text']; assert 'cancelled' in text, f'status_message not found in text: {text}'"; then
+            echo "FAIL: Expected 'cancelled' in message text"
             exit 1
           fi
-          echo "PASS: Failure payload received with correct color 'danger' and title"
+          echo "PASS: Cancelled payload received with correct color 'danger'"

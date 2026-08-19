@@ -1,0 +1,27 @@
+name: Test skip notification when status not in notify_when
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Prepare sentinel file
+        run: |
+          # We'll use absence of a webhook call to verify skip behavior
+          echo "sentinel" > /tmp/skip_test_sentinel.txt
+
+      - id: action
+        uses: .
+        # No SLACK_WEBHOOK_URL set — action should exit early before needing it
+        with:
+          status: success
+          # Only notify on failure — success should be skipped
+          notify_when: "failure,cancelled"
+
+      - name: Assert action completed without error (skip path)
+        run: |
+          # If we reach here, the action did not throw an error
+          # (which would happen if it tried to send a notification without SLACK_WEBHOOK_URL)
+          echo "PASS: Action completed without error on skipped status"
