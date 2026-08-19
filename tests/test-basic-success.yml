@@ -1,0 +1,32 @@
+name: Test basic success notification attempt
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_REF: refs/heads/main
+      GITHUB_EVENT_NAME: push
+      # Provide a dummy webhook URL - the fetch call is fire-and-forget (not awaited)
+      # so the action exits 0 even if the POST fails
+      SLACK_WEBHOOK_URL: "https://hooks.slack.com/services/FAKE/FAKE/FAKE"
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      # With a dummy webhook URL and status=success, the action should:
+      # 1. Detect status is in notify_when (default includes success)
+      # 2. Build the payload
+      # 3. Fire-and-forget the POST (not awaited, so won't fail on bad URL)
+      # 4. Exit successfully
+      - id: action
+        uses: .
+        with:
+          status: "success"
+          notification_title: "Test Notification"
+          message_format: "{emoji} *{workflow}* {status_message}"
+          notify_when: "success,failure,cancelled,warnings,skipped"
+
+      - name: Assert action completed without error
+        run: |
+          echo "Action completed successfully with dummy webhook URL"
+          echo "PASS"

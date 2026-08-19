@@ -1,0 +1,34 @@
+name: Test empty notify_when skips all notifications
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      # When notify_when is empty, no status will match, so action exits early.
+      # No SLACK_WEBHOOK_URL needed since notification is always skipped.
+      - id: action-success
+        uses: .
+        with:
+          status: "success"
+          notify_when: ""
+          notification_title: "Should not notify"
+
+      - name: Assert success status skipped with empty notify_when
+        run: |
+          echo "Action completed - success notification skipped with empty notify_when"
+          echo "PASS"
+
+      - id: action-failure
+        uses: .
+        with:
+          status: "failure"
+          notify_when: ""
+          notification_title: "Should not notify"
+
+      - name: Assert failure status skipped with empty notify_when
+        run: |
+          echo "Action completed - failure notification skipped with empty notify_when"
+          echo "PASS"

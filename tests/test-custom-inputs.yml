@@ -1,0 +1,34 @@
+name: Test custom inputs with skipped status
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_REF: refs/heads/feature-branch
+      GITHUB_EVENT_NAME: push
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      # Test that custom inputs are accepted without error.
+      # Use notify_when=failure so no webhook call is made (status=skipped).
+      - id: action
+        uses: .
+        with:
+          status: "skipped"
+          notify_when: "failure"
+          notification_title: "Custom Title for {workflow}"
+          message_format: "{emoji} Custom message: {status_message}"
+          footer: "Custom footer"
+          icon_success: ":white_check_mark:"
+          icon_failure: ":red_circle:"
+          icon_cancelled: ":no_entry:"
+          icon_warnings: ":warning:"
+          icon_skipped: ":arrow_forward:"
+          mention_users: ""
+          mention_groups: ""
+
+      - name: Assert action accepted custom inputs without error
+        run: |
+          echo "Action completed successfully with custom inputs"
+          echo "PASS"

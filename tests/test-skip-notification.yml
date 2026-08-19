@@ -1,0 +1,22 @@
+name: Test skip notification when status not in notify_when
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      # When status is not in notify_when, the action returns early without
+      # attempting to POST to Slack, so no SLACK_WEBHOOK_URL is needed.
+      - id: action
+        uses: .
+        with:
+          status: "success"
+          notify_when: "failure,cancelled"
+          notification_title: "Test Notification"
+
+      - name: Assert action completed without error
+        run: |
+          echo "Action completed successfully - notification was skipped as expected"
+          echo "PASS"

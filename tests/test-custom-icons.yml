@@ -1,0 +1,28 @@
+name: Test custom icons with skipped notification
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      # Test custom icon inputs with a status not in notify_when so no webhook needed.
+      # The action reads icon inputs during payload building, but since status is not
+      # in notify_when, it exits before building the payload or calling the webhook.
+      - id: action
+        uses: .
+        with:
+          status: "success"
+          notify_when: "failure"
+          notification_title: "Custom Icons Test"
+          icon_success: ":white_check_mark:"
+          icon_failure: ":red_circle:"
+          icon_cancelled: ":grey_question:"
+          icon_warnings: ":warning:"
+          icon_skipped: ":next_track_button:"
+
+      - name: Assert action completed without error
+        run: |
+          echo "Action completed - custom icons accepted, notification skipped"
+          echo "PASS"

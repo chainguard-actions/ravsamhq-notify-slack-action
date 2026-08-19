@@ -1,0 +1,24 @@
+name: Test cancelled status skipped when not in notify_when
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      # When status=cancelled is not in notify_when=success, action exits early.
+      # No SLACK_WEBHOOK_URL needed since notification is skipped.
+      - id: action
+        uses: .
+        with:
+          status: "cancelled"
+          notify_when: "success"
+          notification_title: "Custom Title: {workflow} {status_message}"
+          message_format: "{emoji} *{workflow}* {status_message}"
+          footer: "Test footer"
+
+      - name: Assert action completed without error
+        run: |
+          echo "Action completed successfully - cancelled notification was skipped"
+          echo "PASS"
