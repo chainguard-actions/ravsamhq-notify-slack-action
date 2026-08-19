@@ -1,0 +1,24 @@
+name: Test skip notification when status not in notify_when
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - id: action
+        uses: .
+        with:
+          status: skipped
+          notify_when: "success,failure"
+          # No SLACK_WEBHOOK_URL set — action should return early before calling notifySlack
+      - name: Assert action succeeded (early return, no webhook needed)
+        env:
+          OUTCOME: ${{ steps.action.outcome }}
+        run: |
+          echo "outcome: $OUTCOME"
+          if [ "$OUTCOME" != "success" ]; then
+            echo "FAIL: expected action to succeed (early return) when status not in notify_when, got '$OUTCOME'"
+            exit 1
+          fi
+          echo "PASS: action returned early without attempting Slack notification"

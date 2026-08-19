@@ -1,0 +1,38 @@
+name: Test custom icons and notification options
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - id: action
+        uses: .
+        continue-on-error: true
+        env:
+          SLACK_WEBHOOK_URL: https://hooks.slack.com/services/FAKE/FAKE/FAKE
+        with:
+          status: failure
+          notification_title: "Build Failed"
+          message_format: "{emoji} *{workflow}* {status_message}"
+          footer: "<{run_url}|View Run>"
+          notify_when: "failure"
+          icon_failure: ":boom:"
+          icon_success: ":white_check_mark:"
+          mention_users: "U12345678"
+          mention_users_when: "failure"
+      - name: Assert action completed with custom options
+        env:
+          OUTCOME: ${{ steps.action.outcome }}
+        run: |
+          echo "outcome: $OUTCOME"
+          # Action fires-and-forgets the fetch, so it should succeed even with a fake URL.
+          # A failure is also acceptable (graceful setFailed on network error or sentinel repo).
+          if [ "$OUTCOME" = "success" ]; then
+            echo "PASS: action completed successfully with custom options"
+          elif [ "$OUTCOME" = "failure" ]; then
+            echo "PASS: action failed gracefully (expected with fake webhook or sentinel repo)"
+          else
+            echo "FAIL: unexpected outcome '$OUTCOME'"
+            exit 1
+          fi

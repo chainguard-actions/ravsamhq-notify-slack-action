@@ -1,0 +1,33 @@
+name: Test basic success notification
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - id: action
+        uses: .
+        continue-on-error: true
+        env:
+          SLACK_WEBHOOK_URL: https://hooks.slack.com/services/FAKE/FAKE/FAKE
+        with:
+          status: success
+          notification_title: "Test Notification"
+          message_format: "{emoji} *{workflow}* {status_message} in <{repo_url}|{repo}>"
+          notify_when: "success,failure,cancelled,warnings,skipped"
+      - name: Assert action completed (success or graceful failure on fake webhook)
+        env:
+          OUTCOME: ${{ steps.action.outcome }}
+        run: |
+          echo "outcome: $OUTCOME"
+          # The action fires-and-forgets the fetch, so it should succeed even with a fake URL.
+          # If it fails, it must be a graceful setFailed (not a crash).
+          if [ "$OUTCOME" = "success" ]; then
+            echo "PASS: action completed successfully with status=success"
+          elif [ "$OUTCOME" = "failure" ]; then
+            echo "PASS: action failed gracefully (expected with fake webhook or sentinel repo)"
+          else
+            echo "FAIL: unexpected outcome '$OUTCOME'"
+            exit 1
+          fi

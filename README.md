@@ -1,17 +1,281 @@
-# ravsamhq/notify-slack-action
+[![Create Release](https://github.com/ravsamhq/notify-slack-action/actions/workflows/release.yml/badge.svg)](https://github.com/ravsamhq/notify-slack-action/actions/workflows/release.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-Send Github Actions workflow status notifications to Slack
+# Notify Slack Action
 
-Hardened by [Chainguard](https://www.chainguard.dev) from the upstream action at [https://github.com/ravsamhq/notify-slack-action](https://github.com/ravsamhq/notify-slack-action).
+Send Github Actions workflow status notifications to Slack regarding failures, warnings or even success. You can read more about the action in [our blog post](https://www.ravsam.in/blog/send-slack-notification-when-github-actions-fails/).
 
-## Versions
+## Features
 
-| Version | Tag | Upstream commit |
-|---------|-----|-----------------|
-| 2.2.1 | [`2.2.1`](https://github.com/chainguard-actions/ravsamhq-notify-slack-action/tree/2.2.1) | [`1a3c9e0`](https://github.com/ravsamhq/notify-slack-action/commit/1a3c9e05e86f070fc94f31181898cde31a6f2555) |
-| 2.3.0 | [`2.3.0`](https://github.com/chainguard-actions/ravsamhq-notify-slack-action/tree/2.3.0) | [`bca2d7f`](https://github.com/ravsamhq/notify-slack-action/commit/bca2d7f5660b833a27bda4f6b8bef389ebfefd25) |
-| 2.4.0 | [`2.4.0`](https://github.com/chainguard-actions/ravsamhq-notify-slack-action/tree/2.4.0) | [`6bed6f7`](https://github.com/ravsamhq/notify-slack-action/commit/6bed6f7939dd62482d6d532f1ec940a974fd8975) |
-| 2.5.0 | [`2.5.0`](https://github.com/chainguard-actions/ravsamhq-notify-slack-action/tree/2.5.0) | [`be814b2`](https://github.com/ravsamhq/notify-slack-action/commit/be814b201e233b2dc673608aa46e5447c8ab13f2) |
+- [x] Ability to control when to send notification
+- [x] Custom Notification Title, Message and Footer using template variables
+- [x] Mention Users and control when to mention them
+- [x] Mention Users Groups and control when to mention them
+- [x] Customize icons based on the action status
+
+## Example workflows
+
+### Minimal workflow
+
+![](screenshots/minimal.png)
+
+```yaml
+steps:
+  - uses: ravsamhq/notify-slack-action@v2
+    if: always()
+    with:
+      status: ${{ job.status }} # required
+    env:
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }} # required
+```
+
+### Running a workflow only on the specified branch
+
+To run the notifier for a specific branch, you can utilize the either `github.ref_name` for pushes or `github.head_ref` for pull requests. For example, if you want to run the notifier only on the **origin/main** branch for pushes the following would constrain the workflow to that branch:
+
+```yaml
+steps:
+  - name: Notify Slack Action
+    uses: ravsamhq/notify-slack-action@2.3.0
+    if: ${{ always() && github.ref_name == 'main' }}
+    with:
+      status: ${{ job.status }}
+      notify_when: "failure"
+      notification_title: "{workflow} is failing"
+    env:
+      SLACK_WEBHOOK_URL: ${{ secrets.ACTION_MONITORING_SLACK }}
+```
+
+### Extended Example without User Mentions
+
+![](screenshots/without-mentions.png)
+
+```yaml
+steps:
+  - uses: ravsamhq/notify-slack-action@v2
+    if: always()
+    with:
+      status: ${{ job.status }}
+      token: ${{ secrets.GITHUB_TOKEN }}
+      notification_title: "{workflow} has {status_message}"
+      message_format: "{emoji} *{workflow}* {status_message} in <{repo_url}|{repo}>"
+      footer: "Linked Repo <{repo_url}|{repo}> | <{workflow_url}|View Workflow>"
+    env:
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+```
+
+### Extended Example with User Mentions
+
+![](screenshots/with-mentions.png)
+
+```yaml
+steps:
+  - uses: ravsamhq/notify-slack-action@v2
+    if: always()
+    with:
+      status: ${{ job.status }}
+      notification_title: "{workflow} has {status_message}"
+      message_format: "{emoji} *{workflow}* {status_message} in <{repo_url}|{repo}>"
+      footer: "Linked Repo <{repo_url}|{repo}>"
+      notify_when: "failure"
+      mention_users: "U0160UUNH8S,U0080UUAA9N"
+      mention_users_when: "failure,warnings"
+    env:
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+```
+
+> To get the Slack Member IDs, open the User profile you want to mention. Click _More_ and _Copy Member ID_.
+
+### Extended Example with Users Groups Mentions
+
+```yaml
+steps:
+  - uses: ravsamhq/notify-slack-action@v2
+    if: always()
+    with:
+      status: ${{ job.status }}
+      notification_title: "{workflow} has {status_message}"
+      message_format: "{emoji} *{workflow}* {status_message} in <{repo_url}|{repo}>"
+      footer: "Linked Repo <{repo_url}|{repo}>"
+      notify_when: "failure"
+      mention_users: "U0160UUNH8S,U0080UUAA9N"
+      mention_users_when: "failure,warnings"
+      mention_groups: "SAZ94GDB8"
+      mention_groups_when: "failure,warnings"
+    env:
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+```
+
+To mention a channel, you can configure the `mention_groups` key like:
+
+```yaml
+mention_groups: "SAZ94GDB8,!channel"
+```
+
+The following variables are available for formatting your own strings.
+
+- {branch}
+- {branch_url}
+- {commit_url}
+- {commit_sha}
+- {emoji}
+- {repo}
+- {repo_url}
+- {status_message}
+- {run_url}
+- {job}
+- {workflow}
+- {workflow_url}
+
+You can use these to construct custom `notification_title`, `message_format` and `footer`.
+
+> In order to use `{workflow_url}`, specify the `token` input as `token: ${{ secrets.GITHUB_TOKEN }}`.
+
+The above mentioned strings are available by default. However, you can use the following method to use any kind of data available in GitHub Actions:
+
+1. Add the following step to get all the information related to your GitHub context
+
+```yml
+steps:
+  - run: echo "${{ toJson(github) }}"
+```
+
+2. Then you can reference the `github` object properties:
+
+```
+github.event.head_commit.author.name
+github.event.head_commit.message
+```
+
+as
+
+```yml
+steps:
+  - uses: ravsamhq/notify-slack-action@v2
+    if: always()
+    with:
+      ...
+      message_format: '{emoji} ${{ github.event.head_commit.author.name }} ${{ github.event.head_commit.message }}'
+    env:
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+```
+
+## Inputs
+
+```yml
+status:
+  description: Job Status
+  required: true
+
+token:
+  description: Github Token for accessing workflow url
+  required: false
+  default: ""
+
+notification_title:
+  description: Specify on the notification message title
+  required: false
+  default: "New Github Action Run"
+
+message_format:
+  description: Specify on the notification message format
+  required: false
+  default: "{emoji} *{workflow}* {status_message} in <{repo_url}|{repo}@{branch}> on <{commit_url}|{commit_sha}>"
+
+footer:
+  description: Specify the footer of the message
+  required: false
+  default: "<{run_url}|View Run> | Developed by <https://www.ravsam.in|RavSam>"
+
+notify_when:
+  description: Specify on which events a slack notification is sent
+  required: false
+  default: "success,failure,cancelled,warnings,skipped"
+
+mention_users:
+  description: Specify the slack IDs of users you want to mention.
+  required: false
+  default: ""
+
+mention_users_when:
+  description: Specify on which events you want to mention the users
+  required: false
+  default: "success,failure,cancelled,warnings,skipped"
+
+mention_groups:
+  description: Specify the slack IDs of groups you want to mention
+  required: false
+  default: ""
+
+mention_groups_when:
+  description: Specify on which events you want to mention the groups
+  required: false
+  default: "success,failure,cancelled,warnings,skipped"
+
+icon_success:
+  description: Specify on icon to be used when event is success
+  required: false
+  default: ":heavy_check_mark:"
+
+icon_failure:
+  description: Specify on icon to be used when event is failure
+  required: false
+  default: ":x:"
+
+icon_cancelled:
+  description: Specify on icon to be used when event is cancelled
+  required: false
+  default: ":x:"
+
+icon_warnings:
+  description: Specify on icon to be used when event is warnings
+  required: false
+  default: ":large_orange_diamond:"
+
+icon_skipped:
+  description: Specify on icon to be used when event is skipped
+  required: false
+  default: ":fast_forward:"
+```
+
+## Development
+
+Follow these instructions to get the project up and running:
+
+```bash
+# clone the repo
+git clone https://github.com/ravsamhq/notify-slack-action.git
+
+# change directory
+cd notify-slack-action
+
+# install dependencies
+npm install
+```
+
+## Versioning
+
+This project uses [SemVer](http://semver.org/) for versioning. For the versions available, see the [tags on this repository](https://github.com/ravsamhq/notify-slack-action/tags).
+
+## Authors
+
+- [Ravgeet Dhillon](https://github.com/ravgeetdhillon)
+
+## Contributors
+
+- [Ravgeet Dhillon](https://github.com/ravgeetdhillon)
+- [Jirka Borovec](https://github.com/Borda)
+- [Vlad Pronsky](https://github.com/vladkens)
+- [erezarnon](https://github.com/erezarnon)
+
+> Special shoutout to [Vlad Pronsky](https://github.com/vladkens) for porting the original Python based code to Typescript.
+
+## Extra
+
+- We are open for [issues and feature requests](https://github.com/ravsamhq/notify-slack-action/issues).
+- In case you get stuck at somewhere, feel free to contact at our [Mail](mailto:info@ravsam.in).
+
+<small>&copy; 2022 RavSam Web Solutions</small>
 
 ## Privacy
 
