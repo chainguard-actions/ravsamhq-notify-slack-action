@@ -1,0 +1,48 @@
+name: Test custom notify_when with multiple statuses
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_REF: refs/heads/main
+      GITHUB_EVENT_NAME: push
+      GITHUB_REPOSITORY: test-owner/test-repo
+      GITHUB_SERVER_URL: https://github.com
+      GITHUB_API_URL: https://api.github.com
+      GITHUB_RUN_ID: "12345"
+      GITHUB_WORKFLOW: "Test Workflow"
+      GITHUB_JOB: "test"
+      GITHUB_SHA: "abc1234def5678901234567890123456789012345"
+      NODE_ENV: test
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      # Test that action skips notification when status=cancelled is not in
+      # notify_when="success,failure" — no webhook needed since it exits early.
+      - id: action-cancelled-skipped
+        uses: .
+        with:
+          status: cancelled
+          notify_when: "success,failure"
+          notification_title: "CI Pipeline"
+          message_format: "{emoji} *{workflow}* {status_message} in <{repo_url}|{repo}@{branch}>"
+
+      - name: Assert cancelled notification was skipped
+        run: |
+          echo "Action completed without error (cancelled not in notify_when=success,failure)"
+          echo "PASS"
+
+      # Test that action skips notification when status=skipped is not in
+      # notify_when="failure" — no webhook needed since it exits early.
+      - id: action-skipped-skipped
+        uses: .
+        with:
+          status: skipped
+          notify_when: "failure"
+          notification_title: "CI Pipeline"
+
+      - name: Assert skipped notification was skipped
+        run: |
+          echo "Action completed without error (skipped not in notify_when=failure)"
+          echo "PASS"

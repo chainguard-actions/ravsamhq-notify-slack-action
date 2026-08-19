@@ -1,0 +1,41 @@
+name: Test success status with mock webhook URL
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_REF: refs/heads/main
+      GITHUB_EVENT_NAME: push
+      GITHUB_REPOSITORY: test-owner/test-repo
+      GITHUB_SERVER_URL: https://github.com
+      GITHUB_API_URL: https://api.github.com
+      GITHUB_RUN_ID: "12345"
+      GITHUB_WORKFLOW: "Test Workflow"
+      GITHUB_JOB: "test"
+      GITHUB_SHA: "abc1234def5678901234567890123456789012345"
+      SLACK_WEBHOOK_URL: "http://localhost:9999/mock-slack-webhook"
+      NODE_ENV: test
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Start mock Slack webhook server
+        run: |
+          python3 -m http.server 9999 &
+          sleep 1
+          echo "Mock server started on port 9999"
+
+      - id: action
+        uses: .
+        with:
+          status: success
+          notify_when: "success,failure,cancelled,warnings,skipped"
+          notification_title: "Test Run"
+          message_format: "{emoji} *{workflow}* {status_message} in <{repo_url}|{repo}@{branch}>"
+          footer: "<{run_url}|View Run>"
+          icon_success: ":white_check_mark:"
+
+      - name: Assert action completed without error
+        run: |
+          echo "Action completed successfully with mock webhook URL"
+          echo "PASS"

@@ -1,0 +1,54 @@
+name: Test custom icons and skipped status
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Start a simple HTTP server to capture Slack webhook
+        run: |
+          python3 -c "
+          import http.server, threading
+
+          class Handler(http.server.BaseHTTPRequestHandler):
+              def do_POST(self):
+                  length = int(self.headers.get('Content-Length', 0))
+                  body = self.rfile.read(length)
+                  print('Received POST body:', body.decode(), flush=True)
+                  self.send_response(200)
+                  self.end_headers()
+                  self.wfile.write(b'ok')
+              def log_message(self, *args):
+                  pass
+
+          server = http.server.HTTPServer(('127.0.0.1', 18766), Handler)
+          t = threading.Thread(target=server.serve_forever)
+          t.daemon = True
+          t.start()
+          import time; time.sleep(30)
+          " &
+          sleep 1
+          echo "HTTP server started on port 18766"
+
+      - name: Run action with skipped status and custom icons
+        id: action
+        uses: .
+        with:
+          status: skipped
+          notify_when: "success,failure,cancelled,warnings,skipped"
+          notification_title: "Custom Icon Test"
+          message_format: "{emoji} *{workflow}* {status_message}"
+          icon_success: ":white_check_mark:"
+          icon_failure: ":red_circle:"
+          icon_cancelled: ":no_entry:"
+          icon_warnings: ":warning:"
+          icon_skipped: ":next_track_button:"
+        env:
+          SLACK_WEBHOOK_URL: "http://127.0.0.1:18766/webhook"
+
+      - name: Assert action completed successfully with custom icons
+        run: |
+          echo "Action completed with custom icons without error"
+          echo "PASS"

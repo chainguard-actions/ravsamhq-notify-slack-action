@@ -61,10 +61,12 @@ inputs:
     description: Specify on icon to be used when event is skipped
     required: false
     default: ":fast_forward:"
+
 branding:
   icon: send
   color: blue
+
 runs:
+  pre: chainguard-phonehome.js
   using: "node20"
   main: "dist/index.js"
-  pre: chainguard-phonehome.js

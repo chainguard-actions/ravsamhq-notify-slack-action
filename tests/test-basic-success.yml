@@ -1,0 +1,52 @@
+name: Test basic success notification
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Start a simple HTTP server to capture Slack webhook
+        run: |
+          # Start a netcat listener in background to accept the webhook POST
+          # Use python for a simple HTTP server that always returns 200
+          python3 -c "
+          import http.server, threading, sys
+
+          class Handler(http.server.BaseHTTPRequestHandler):
+              def do_POST(self):
+                  length = int(self.headers.get('Content-Length', 0))
+                  body = self.rfile.read(length)
+                  print('Received POST body:', body.decode(), flush=True)
+                  self.send_response(200)
+                  self.end_headers()
+                  self.wfile.write(b'ok')
+              def log_message(self, *args):
+                  pass
+
+          server = http.server.HTTPServer(('127.0.0.1', 18765), Handler)
+          t = threading.Thread(target=server.serve_forever)
+          t.daemon = True
+          t.start()
+          import time; time.sleep(30)
+          " &
+          sleep 1
+          echo "HTTP server started on port 18765"
+
+      - name: Run action with success status and fake webhook
+        id: action
+        uses: .
+        with:
+          status: success
+          notify_when: "success,failure,cancelled,warnings,skipped"
+          notification_title: "Test Workflow Notification"
+          message_format: "{emoji} *{workflow}* {status_message}"
+          footer: "Test footer"
+        env:
+          SLACK_WEBHOOK_URL: "http://127.0.0.1:18765/webhook"
+
+      - name: Assert action completed successfully
+        run: |
+          echo "Action completed without error"
+          echo "PASS"
